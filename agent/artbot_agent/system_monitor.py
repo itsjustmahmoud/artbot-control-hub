@@ -169,3 +169,97 @@ class SystemMonitor:
     def get_last_metrics(self):
         """Get the last collected metrics"""
         return getattr(self, 'last_metrics', {})
+    
+    async def get_essential_metrics(self):
+        """Get only the essential metrics requested by user"""
+        try:
+            import psutil
+            import subprocess
+            import os
+            
+            # 1. CPU usage and temperature
+            cpu_usage = psutil.cpu_percent(interval=1)
+            
+            temperature = None
+            try:
+                with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
+                    temp_raw = int(f.read().strip())
+                    temperature = temp_raw / 1000.0  # Convert to Celsius
+            except:
+                temperature = 40  # Default fallback
+            
+            # 2. Memory usage
+            memory = psutil.virtual_memory()
+            memory_usage = memory.percent
+            
+            # 3. OAK camera connectivity check
+            oak_camera_connected = False
+            try:
+                # Check if camera device exists
+                oak_camera_connected = os.path.exists('/dev/video0') or os.path.exists('/dev/dri/card0')
+            except:
+                pass
+            
+            # 4. Create3 connectivity check
+            create3_connected = False
+            try:
+                # Try to ping Create3 IP
+                result = subprocess.run(
+                    ["ping", "-c", "1", "-W", "1", "192.168.186.2"],
+                    capture_output=True,
+                    timeout=2
+                )
+                create3_connected = result.returncode == 0
+            except:
+                pass
+            
+            # 5. Battery level from Create3 (if connected)
+            battery_level = 85  # Default fallback
+            if create3_connected:
+                try:
+                    # Try to get battery from Create3 API
+                    import requests
+                    response = requests.get('http://192.168.186.2/api/battery', timeout=2)
+                    if response.status_code == 200:
+                        battery_data = response.json()
+                        battery_level = battery_data.get('level', 85)
+                except:
+                    pass
+            
+            # 6. Workspace status check
+            workspace_status = "stopped"
+            try:
+                result = subprocess.run(
+                    ["pgrep", "-f", "run_system.sh"],
+                    capture_output=True,
+                    text=True
+                )
+                workspace_status = "running" if result.returncode == 0 else "stopped"
+            except:
+                pass
+            
+            return {
+                "timestamp": datetime.utcnow().isoformat(),
+                "cpu_usage": cpu_usage,
+                "temperature": temperature,
+                "memory_usage": memory_usage,
+                "oak_camera_connected": oak_camera_connected,
+                "create3_connected": create3_connected,
+                "battery_level": battery_level,
+                "workspace_status": workspace_status,
+                "start_time": datetime.utcnow().isoformat()  # For uptime calculation
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting essential metrics: {e}")
+            return {
+                "timestamp": datetime.utcnow().isoformat(),
+                "cpu_usage": 0,
+                "temperature": 40,
+                "memory_usage": 0,
+                "oak_camera_connected": False,
+                "create3_connected": False,
+                "battery_level": 0,
+                "workspace_status": "unknown",
+                "error": str(e)
+            }

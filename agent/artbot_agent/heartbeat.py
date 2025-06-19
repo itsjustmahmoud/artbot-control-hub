@@ -3,6 +3,7 @@ import aiohttp
 import json
 import logging
 from datetime import datetime
+from .system_monitor import SystemMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -12,14 +13,18 @@ class HeartbeatManager:
     def __init__(self, config):
         self.config = config
         self.running = False
+        self.system_monitor = SystemMonitor(config)
     
     async def send_heartbeat(self):
-        """Send heartbeat to hub"""
+        """Send heartbeat with essential metrics to hub"""
         try:
+            # Get essential metrics only
+            essential_metrics = await self.system_monitor.get_essential_metrics()
+            
             heartbeat_data = {
                 "timestamp": datetime.utcnow().isoformat(),
                 "status": "online",
-                "system_metrics": await self.get_system_metrics()
+                **essential_metrics  # Flatten the essential metrics into heartbeat
             }
             
             async with aiohttp.ClientSession() as session:

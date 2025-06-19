@@ -236,11 +236,12 @@ class RobotManager:
             "name": f"Artbot {robot_id}",
             "status": "online",
             "current_action": "idle",
-            "battery_level": robot_info.get("battery_level", 85),
-            "cpu_usage": 25,
-            "memory_usage": 45,
-            "temperature": 42,
+            "battery_level": robot_info.get("battery_level", 0),
+            "cpu_usage": 0,
+            "memory_usage": 0,
+            "temperature": 0,
             "ip_address": agent_info.get("ip_address", "unknown"),
+            "hostname": agent_info.get("hostname", robot_id),
             "last_update": datetime.utcnow().isoformat(),
             "agent_id": robot_id,
             "type": robot_info.get("type", "unknown"),
@@ -248,8 +249,11 @@ class RobotManager:
             "capabilities": robot_info.get("capabilities", []),
             "sensors": robot_info.get("sensors", []),
             "ros2_available": robot_info.get("ros2_available", False),
-            "person_following_available": robot_info.get("person_following_available", False)
-        }
+            "person_following_available": robot_info.get("person_following_available", False),
+            "oak_camera_connected": "oak_camera" in robot_info.get("sensors", []),
+            "create3_connected": "create3" in robot_info.get("capabilities", []),
+            "uptime": 0,
+            "workspace_status": "stopped"        }
         logger.info(f"Robot {robot_id} registered")
     
     def update_agent_heartbeat(self, agent_id: str, data: dict = None):
@@ -261,11 +265,83 @@ class RobotManager:
             if data:
                 self.agents[agent_id].update(data)
             
-            # Update associated robot status
-            if agent_id in self.robots:
-                self.robots[agent_id]["last_update"] = datetime.utcnow()
-                if data and "robot_status" in data:
-                    self.robots[agent_id].update(data["robot_status"])
+            # Update associated robot status with real metrics
+            if agent_id in self.robots and data:
+                robot = self.robots[agent_id]
+                robot["last_update"] = datetime.utcnow().isoformat()
+                
+                # Update CPU and temperature
+                if "cpu_usage" in data:
+                    robot["cpu_usage"] = data["cpu_usage"]
+                if "temperature" in data:
+                    robot["temperature"] = data["temperature"]
+                
+                # Update memory usage
+                if "memory_usage" in data:
+                    robot["memory_usage"] = data["memory_usage"]
+                
+                # Update battery level from Create3
+                if "battery_level" in data:
+                    robot["battery_level"] = data["battery_level"]
+                
+                # Update connectivity status
+                if "oak_camera_connected" in data:
+                    robot["oak_camera_connected"] = data["oak_camera_connected"]
+                if "create3_connected" in data:
+                    robot["create3_connected"] = data["create3_connected"]
+                
+                # Update workspace status
+                if "workspace_status" in data:
+                    robot["workspace_status"] = data["workspace_status"]
+                
+                # Calculate uptime if start time is available
+                if "start_time" in data:
+                    start_time = datetime.fromisoformat(data["start_time"])
+                    uptime_seconds = (datetime.utcnow() - start_time).total_seconds()
+                    robot["uptime"] = int(uptime_seconds)
+                
+                logger.debug(f"Updated robot {agent_id} with metrics: {list(data.keys())}")
+                
+                # Extract system metrics if available
+                if "system_metrics" in data:
+                    metrics = data["system_metrics"]
+                    
+                    # CPU usage and temperature
+                    if "cpu_percent" in metrics:
+                        self.robots[agent_id]["cpu_usage"] = metrics["cpu_percent"]
+                    
+                    # Memory usage
+                    if "memory_percent" in metrics:
+                        self.robots[agent_id]["memory_usage"] = metrics["memory_percent"]
+                    
+                    # Temperature from Pi
+                    if "temperature" in metrics and isinstance(metrics["temperature"], dict):
+                        self.robots[agent_id]["temperature"] = metrics["temperature"].get("celsius", 0)
+                    
+                    # Uptime calculation (from registration time)
+                    agent_info = self.agents.get(agent_id, {})
+                    if "registered_at" in agent_info:
+                        uptime_seconds = (datetime.utcnow() - agent_info["registered_at"]).total_seconds()
+                        self.robots[agent_id]["uptime"] = int(uptime_seconds)
+                
+                # Extract robot-specific data
+                if "robot_metrics" in data:
+                    robot_metrics = data["robot_metrics"]
+                    
+                    # Battery level from Create3
+                    if "battery" in robot_metrics and isinstance(robot_metrics["battery"], dict):
+                        battery_level = robot_metrics["battery"].get("level")
+                        if battery_level is not None:
+                            self.robots[agent_id]["battery_level"] = battery_level
+                    
+                    # Workspace status (if person following is running)
+                    if "ros2" in robot_metrics and isinstance(robot_metrics["ros2"], dict):
+                        if robot_metrics["ros2"].get("running", False):
+                            self.robots[agent_id]["workspace_status"] = "running"
+                            self.robots[agent_id]["current_action"] = "person_following"
+                        else:
+                            self.robots[agent_id]["workspace_status"] = "stopped"
+                            self.robots[agent_id]["current_action"] = "idle"
     
     def update_robot_status(self, robot_id: str, status: dict):
         """Update robot status from agent"""
@@ -332,8 +408,7 @@ class RobotManager:
             
             if action:
                 self.robots[robot_id]["current_action"] = action
-            
-            logger.info(f"Robot {robot_id} status set to: {status}")
+              logger.info(f"Robot {robot_id} status set to: {status}")
             return True
         return False
     
@@ -346,6 +421,87 @@ class RobotManager:
         if agent_id in self.robots:
             self.robots[agent_id]["status"] = "offline"
             logger.info(f"Robot {agent_id} marked offline")
+    
+    # Robot Control Commands
+    async def start_workspace(self, robot_id: str) -> bool:
+        """Start the workspace run command on the robot"""
+        if robot_id not in self.robots:
+            return False
+        
+        command = {
+            "action": "start_workspace",
+            "command": "cd ~/ros2_ws && ./run_system.sh"
+        }
+        
+        if self.websocket_manager:
+            await self.websocket_manager.send_to_agent(robot_id, command)
+            logger.info(f"Sent start workspace command to {robot_id}")
+            return True
+        return False
+    
+    async def stop_workspace(self, robot_id: str) -> bool:
+        """Stop the workspace run command on the robot"""
+        if robot_id not in self.robots:
+            return False
+        
+        command = {
+            "action": "stop_workspace",
+            "command": "pkill -f run_system.sh"
+        }
+        
+        if self.websocket_manager:
+            await self.websocket_manager.send_to_agent(robot_id, command)
+            logger.info(f"Sent stop workspace command to {robot_id}")
+            return True
+        return False
+    
+    async def restart_create3(self, robot_id: str) -> bool:
+        """Restart the Create3 application"""
+        if robot_id not in self.robots:
+            return False
+        
+        command = {
+            "action": "restart_create3",
+            "command": "sudo systemctl restart create3"
+        }
+        
+        if self.websocket_manager:
+            await self.websocket_manager.send_to_agent(robot_id, command)
+            logger.info(f"Sent restart Create3 command to {robot_id}")
+            return True
+        return False
+    
+    async def reboot_create3(self, robot_id: str) -> bool:
+        """Reboot the Create3 robot"""
+        if robot_id not in self.robots:
+            return False
+        
+        command = {
+            "action": "reboot_create3",
+            "command": "curl -X POST http://192.168.186.2/api/robot/power/reboot"
+        }
+        
+        if self.websocket_manager:
+            await self.websocket_manager.send_to_agent(robot_id, command)
+            logger.info(f"Sent reboot Create3 command to {robot_id}")
+            return True
+        return False
+    
+    async def get_workspace_logs(self, robot_id: str) -> dict:
+        """Get the workspace run logs from the robot"""
+        if robot_id not in self.robots:
+            return {"error": "Robot not found"}
+        
+        command = {
+            "action": "get_logs",
+            "command": "tail -n 100 ~/ros2_ws/logs/person_following.log"
+        }
+        
+        if self.websocket_manager:
+            await self.websocket_manager.send_to_agent(robot_id, command)
+            logger.info(f"Requested workspace logs from {robot_id}")
+            return {"status": "requested"}
+        return {"error": "WebSocket manager not available"}
 
 # Global instance
 robot_manager = RobotManager()
