@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -10,6 +11,8 @@ class SystemMonitor:
     def __init__(self, config):
         self.config = config
         self.running = False
+        self.start_time = datetime.utcnow()
+        self.last_metrics = {}
     
     async def get_system_metrics(self):
         """Get comprehensive system metrics"""
@@ -86,31 +89,43 @@ class SystemMonitor:
             result = subprocess.run(
                 ["pgrep", "-f", self.config.ros2_package],
                 capture_output=True,
-                text=True
-            )
+                text=True            )
             
             is_running = result.returncode == 0
             processes = result.stdout.strip().split('\n') if is_running else []
             
-            # Get robot battery level if available (placeholder)
+            # Get robot battery level if available
             battery_level = None
             try:
-                # This would be robot-specific implementation
-                # For now, we'll simulate or read from a file
-                pass
+                # First check if Create3 is connected
+                create3_ip = os.getenv("CREATE3_IP", "192.168.186.2")
+                ping_result = subprocess.run(
+                    ["ping", "-c", "1", "-W", "1", create3_ip],
+                    capture_output=True,
+                    timeout=2
+                )
+                create3_connected = ping_result.returncode == 0
+                
+                # Try to get battery level from Create3 API if connected
+                if create3_connected:
+                    import requests
+                    response = requests.get(f'http://{create3_ip}/api/battery', timeout=2)
+                    if response.status_code == 200:
+                        battery_data = response.json()
+                        battery_level = battery_data.get('level', None)
             except:
                 pass
             
             return {
                 "timestamp": datetime.utcnow().isoformat(),
                 "ros2": {
+                    "package": self.config.ros2_package,
                     "running": is_running,
-                    "processes": processes,
-                    "package": self.config.ros2_package
+                    "processes": len(processes),
+                    "process_ids": processes
                 },
                 "battery": {
-                    "level": battery_level,
-                    "status": "unknown"
+                    "level": battery_level
                 }
             }
             
@@ -118,36 +133,40 @@ class SystemMonitor:
             logger.error(f"Error getting robot metrics: {e}")
             return {"error": str(e), "timestamp": datetime.utcnow().isoformat()}
     
+    async def collect_metrics(self):
+        """Collect all metrics"""
+        try:
+            system_metrics = await self.get_system_metrics()
+            robot_metrics = await self.get_robot_metrics()
+            essential_metrics = await self.get_essential_metrics()
+            
+            combined_metrics = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "agent_id": self.config.agent_id,
+                "hostname": self.config.hostname,
+                "system": system_metrics,
+                "robot": robot_metrics,
+                "essential": essential_metrics
+            }
+            
+            self.last_metrics = combined_metrics
+            return combined_metrics
+            
+        except Exception as e:
+            logger.error(f"Error collecting metrics: {e}")
+            return {"error": str(e), "timestamp": datetime.utcnow().isoformat()}
+    
     async def monitor_loop(self):
         """Main monitoring loop"""
         while self.running:
             try:
-                # Get system metrics
-                system_metrics = await self.get_system_metrics()
+                metrics = await self.collect_metrics()
                 
-                # Get robot metrics
-                robot_metrics = await self.get_robot_metrics()
+                # Store latest metrics
+                self.last_metrics = metrics
                 
-                # Log interesting data
-                if "cpu" in system_metrics:
-                    cpu_percent = system_metrics["cpu"]["percent"]
-                    memory_percent = system_metrics["memory"]["percent"]
-                    
-                    if cpu_percent > 80:
-                        logger.warning(f"High CPU usage: {cpu_percent}%")
-                    
-                    if memory_percent > 80:
-                        logger.warning(f"High memory usage: {memory_percent}%")
-                
-                # Check robot status
-                if "ros2" in robot_metrics and not robot_metrics["ros2"]["running"]:
-                    logger.info("Robot processes not running")
-                
-                # Store metrics for reporting (could send to hub periodically)
-                self.last_metrics = {
-                    "system": system_metrics,
-                    "robot": robot_metrics
-                }
+                # You can add additional processing here
+                # e.g., send to hub, store locally, etc.
                 
             except Exception as e:
                 logger.error(f"Monitoring error: {e}")
@@ -158,6 +177,7 @@ class SystemMonitor:
         """Start system monitoring"""
         self.running = True
         self.last_metrics = {}
+        self.start_time = datetime.utcnow()
         
         logger.info(f"Starting system monitoring every {self.config.monitor_interval} seconds")
         await self.monitor_loop()
@@ -195,42 +215,49 @@ class SystemMonitor:
             # 3. OAK camera connectivity check
             oak_camera_connected = False
             try:
-                # Check if camera device exists
-                oak_camera_connected = os.path.exists('/dev/video0') or os.path.exists('/dev/dri/card0')
+                # Check if camera device exists or depthai processes
+                oak_camera_connected = (
+                    os.path.exists('/dev/video0') or 
+                    os.path.exists('/dev/dri/card0') or
+                    len(subprocess.run(["pgrep", "-f", "depthai"], capture_output=True).stdout) > 0
+                )
             except:
                 pass
-            
-            # 4. Create3 connectivity check
+              # 4. Create3 connectivity and battery
             create3_connected = False
+            battery_level = 0
             try:
                 # Try to ping Create3 IP
+                create3_ip = os.getenv("CREATE3_IP", "192.168.186.2")
                 result = subprocess.run(
-                    ["ping", "-c", "1", "-W", "1", "192.168.186.2"],
+                    ["ping", "-c", "1", "-W", "1", create3_ip],
                     capture_output=True,
                     timeout=2
                 )
                 create3_connected = result.returncode == 0
+                
+                # Get battery level if connected
+                if create3_connected:
+                    try:
+                        import requests
+                        response = requests.get(f'http://{create3_ip}/api/battery', timeout=2)
+                        if response.status_code == 200:
+                            battery_data = response.json()
+                            battery_level = battery_data.get('level', 0)
+                    except:
+                        battery_level = 85  # Default fallback
             except:
                 pass
             
-            # 5. Battery level from Create3 (if connected)
-            battery_level = 85  # Default fallback
-            if create3_connected:
-                try:
-                    # Try to get battery from Create3 API
-                    import requests
-                    response = requests.get('http://192.168.186.2/api/battery', timeout=2)
-                    if response.status_code == 200:
-                        battery_data = response.json()
-                        battery_level = battery_data.get('level', 85)
-                except:
-                    pass
+            # 5. Robot Name/ID and Pi hostname
+            robot_name = self.config.agent_id
+            hostname = self.config.hostname
             
-            # 6. Workspace status check
+            # 6. Workspace run status
             workspace_status = "stopped"
             try:
                 result = subprocess.run(
-                    ["pgrep", "-f", "run_system.sh"],
+                    ["pgrep", "-f", "workspace run"],
                     capture_output=True,
                     text=True
                 )
@@ -238,22 +265,29 @@ class SystemMonitor:
             except:
                 pass
             
+            # 7. Robot uptime (time since agent started)
+            uptime_seconds = (datetime.utcnow() - self.start_time).total_seconds()
+            
             return {
                 "timestamp": datetime.utcnow().isoformat(),
-                "cpu_usage": cpu_usage,
-                "temperature": temperature,
-                "memory_usage": memory_usage,
+                "robot_name": robot_name,
+                "hostname": hostname,
+                "cpu_usage": round(cpu_usage, 1),
+                "temperature": round(temperature, 1),
+                "memory_usage": round(memory_usage, 1),
                 "oak_camera_connected": oak_camera_connected,
                 "create3_connected": create3_connected,
                 "battery_level": battery_level,
                 "workspace_status": workspace_status,
-                "start_time": datetime.utcnow().isoformat()  # For uptime calculation
+                "uptime_seconds": int(uptime_seconds)
             }
             
         except Exception as e:
             logger.error(f"Error getting essential metrics: {e}")
             return {
                 "timestamp": datetime.utcnow().isoformat(),
+                "robot_name": getattr(self.config, 'agent_id', 'unknown'),
+                "hostname": getattr(self.config, 'hostname', 'unknown'), 
                 "cpu_usage": 0,
                 "temperature": 40,
                 "memory_usage": 0,
@@ -261,5 +295,6 @@ class SystemMonitor:
                 "create3_connected": False,
                 "battery_level": 0,
                 "workspace_status": "unknown",
+                "uptime_seconds": 0,
                 "error": str(e)
             }

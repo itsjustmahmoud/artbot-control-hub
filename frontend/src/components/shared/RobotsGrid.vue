@@ -28,15 +28,18 @@
       <h3>No Robots Available</h3>
       <p>No robots are currently connected to the system.</p>
     </div>
-    
-    <!-- Robots Grid -->
+      <!-- Robots Grid -->
     <div v-else class="robots-grid">
       <RobotCard
         v-for="robot in robots"
         :key="robot.id"
         :robot="robot"
         :mode="mode"
-        @command="handleCommand"
+        @workspace-start="handleWorkspaceStart"
+        @workspace-stop="handleWorkspaceStop"
+        @restart-create3="handleRestartCreate3"
+        @reboot-create3="handleRebootCreate3"
+        @view-workspace-logs="handleViewWorkspaceLogs"
         @configure="handleConfigure"
         @view-logs="handleViewLogs"
         @delete="handleDelete"
@@ -86,10 +89,24 @@ export default {
     offlineCount() {
       return this.robots.filter(robot => robot.status === 'OFFLINE' || robot.status === 'offline').length
     }
-  },
-  methods: {
+  },  methods: {
     handleCommand(robotId, action) {
       this.$emit('robot-command', robotId, action)
+    },
+    handleWorkspaceStart(robotId) {
+      this.$emit('workspace-start', robotId)
+    },
+    handleWorkspaceStop(robotId) {
+      this.$emit('workspace-stop', robotId)
+    },
+    handleRestartCreate3(robotId) {
+      this.$emit('restart-create3', robotId)
+    },
+    handleRebootCreate3(robotId) {
+      this.$emit('reboot-create3', robotId)
+    },
+    handleViewWorkspaceLogs(robotId) {
+      this.$emit('view-workspace-logs', robotId)
     },
     handleConfigure(robotId) {
       this.$emit('configure-robot', robotId)

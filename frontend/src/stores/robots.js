@@ -203,6 +203,55 @@ export const useRobotsStore = defineStore('robots', {
     
     clearError() {
       this.error = null
-    }
+    },
+    
+    // New role-based API methods
+    async sendWorkspaceCommand(robotId, action) {
+      try {
+        const endpoint = action === 'start' ? 'start' : 'stop'
+        const response = await apiClient.post(`/robots/${robotId}/workspace/${endpoint}`)
+        
+        // Update robot workspace status optimistically
+        if (this.robots[robotId]) {
+          this.robots[robotId].workspace_status = action === 'start' ? 'running' : 'stopped'
+          this.robots[robotId].last_update = new Date().toISOString()
+        }
+        
+        return response.data
+        
+      } catch (error) {
+        this.error = error.response?.data?.detail || `Failed to ${action} workspace`
+        throw error
+      }
+    },
+    
+    async sendCreate3Command(robotId, action) {
+      try {
+        const response = await apiClient.post(`/robots/${robotId}/create3/${action}`)
+        
+        // Update robot Create3 status optimistically
+        if (this.robots[robotId]) {
+          this.robots[robotId].create3_status = action === 'restart' ? 'restarting' : 'rebooting'
+          this.robots[robotId].last_update = new Date().toISOString()
+        }
+        
+        return response.data
+        
+      } catch (error) {
+        this.error = error.response?.data?.detail || `Failed to ${action} Create3`
+        throw error
+      }
+    },
+    
+    async getWorkspaceLogs(robotId) {
+      try {
+        const response = await apiClient.get(`/robots/${robotId}/workspace/logs`)
+        return response.data
+        
+      } catch (error) {
+        this.error = error.response?.data?.detail || 'Failed to get workspace logs'
+        throw error
+      }
+    },
   }
 })

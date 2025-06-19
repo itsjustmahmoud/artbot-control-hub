@@ -21,92 +21,118 @@
         {{ robot.status || 'UNKNOWN' }}
       </div>
     </div>
-    
-    <div class="robot-metrics">
-      <div class="metric-card battery" :class="{ 'low': robot.battery < 20, 'critical': robot.battery < 10 }">
+      <div class="robot-metrics">
+      <!-- Essential Metrics: Battery Level -->
+      <div class="metric-card battery" :class="{ 'low': robot.battery_level < 20, 'critical': robot.battery_level < 10 }">
         <div class="metric-icon">🔋</div>
         <div class="metric-info">
           <span class="metric-label">Battery</span>
-          <span class="metric-value">{{ robot.battery || 0 }}%</span>
+          <span class="metric-value">{{ robot.battery_level || 0 }}%</span>
         </div>
         <div class="battery-bar">
-          <div class="battery-fill" :style="{ width: (robot.battery || 0) + '%' }"></div>
+          <div class="battery-fill" :style="{ width: (robot.battery_level || 0) + '%' }"></div>
         </div>
       </div>
       
-      <div class="metric-card uptime">
-        <div class="metric-icon">⏰</div>
+      <!-- Essential Metrics: CPU & Temperature -->
+      <div class="metric-card cpu-temp">
+        <div class="metric-icon">🌡️</div>
         <div class="metric-info">
-          <span class="metric-label">Last Seen</span>
-          <span class="metric-value">{{ formatTime(robot.lastSeen || robot.last_update) }}</span>
+          <span class="metric-label">CPU / Temp</span>
+          <span class="metric-value">{{ robot.cpu_usage || 0 }}% / {{ robot.temperature || 0 }}°C</span>
         </div>
       </div>
       
-      <div v-if="mode === 'admin'" class="metric-card cpu">
-        <div class="metric-icon">💻</div>
-        <div class="metric-info">
-          <span class="metric-label">CPU Usage</span>
-          <span class="metric-value">{{ robot.cpu_usage || Math.floor(Math.random() * 40 + 20) }}%</span>
-        </div>
-      </div>
-      
-      <div v-if="mode === 'admin'" class="metric-card memory">
+      <!-- Essential Metrics: Memory Usage -->
+      <div class="metric-card memory">
         <div class="metric-icon">🧠</div>
         <div class="metric-info">
           <span class="metric-label">Memory</span>
-          <span class="metric-value">{{ robot.memory_usage || Math.floor(Math.random() * 60 + 30) }}%</span>
+          <span class="metric-value">{{ robot.memory_usage || 0 }}%</span>
         </div>
       </div>
-    </div>
-
-    <div class="robot-actions" :class="mode">
+      
+      <!-- Essential Metrics: Connectivity Status -->
+      <div class="metric-card connectivity">
+        <div class="metric-icon">�</div>
+        <div class="metric-info">
+          <span class="metric-label">Connectivity</span>
+          <div class="connectivity-status">
+            <span class="status-item" :class="{ 'connected': robot.oak_camera_connected }">
+              📷 {{ robot.oak_camera_connected ? 'OAK' : 'No OAK' }}
+            </span>
+            <span class="status-item" :class="{ 'connected': robot.create3_connected }">
+              🤖 {{ robot.create3_connected ? 'Create3' : 'No Create3' }}
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Essential Metrics: Workspace Status -->
+      <div class="metric-card workspace">
+        <div class="metric-icon">⚙️</div>
+        <div class="metric-info">
+          <span class="metric-label">Workspace</span>
+          <span class="metric-value" :class="robot.workspace_status">
+            {{ robot.workspace_status === 'running' ? '▶️ Running' : '⏸️ Stopped' }}
+          </span>
+        </div>
+      </div>
+      
+      <!-- Essential Metrics: Uptime -->
+      <div class="metric-card uptime">
+        <div class="metric-icon">⏰</div>
+        <div class="metric-info">
+          <span class="metric-label">Uptime</span>
+          <span class="metric-value">{{ formatUptime(robot.uptime_seconds) }}</span>
+        </div>
+      </div>
+    </div>    <div class="robot-actions" :class="mode">
+      <!-- Museum Staff & Admin: Workspace Controls -->
       <div class="primary-actions">
         <button 
-          @click="$emit('command', robot.id, 'start')" 
-          :disabled="robot.status === 'OFFLINE'"
+          @click="$emit('workspace-start', robot.id)" 
+          :disabled="robot.status === 'OFFLINE' || robot.workspace_status === 'running'"
           class="action-btn primary-btn start-btn"
         >
           <span class="btn-icon">▶️</span>
-          Start
+          Start Workspace
         </button>
         <button 
-          @click="$emit('command', robot.id, 'stop')" 
-          :disabled="robot.status === 'OFFLINE'"
+          @click="$emit('workspace-stop', robot.id)" 
+          :disabled="robot.status === 'OFFLINE' || robot.workspace_status === 'stopped'"
           class="action-btn primary-btn stop-btn"
         >
           <span class="btn-icon">⏸️</span>
-          Stop
+          Stop Workspace
         </button>
       </div>
       
+      <!-- Admin Only: Advanced Controls -->
       <div v-if="mode === 'admin'" class="secondary-actions">
         <button 
-          @click="$emit('command', robot.id, 'reboot')" 
-          :disabled="robot.status === 'OFFLINE'"
+          @click="$emit('restart-create3', robot.id)" 
+          :disabled="robot.status === 'OFFLINE' || !robot.create3_connected"
           class="action-btn secondary-btn"
         >
           <span class="btn-icon">🔄</span>
-          Reboot
+          Restart Create3
         </button>
-        <button @click="$emit('configure', robot.id)" class="action-btn secondary-btn">
-          <span class="btn-icon">⚙️</span>
-          Configure
+        <button 
+          @click="$emit('reboot-create3', robot.id)" 
+          :disabled="robot.status === 'OFFLINE' || !robot.create3_connected"
+          class="action-btn secondary-btn"
+        >
+          <span class="btn-icon">�</span>
+          Reboot Create3
         </button>
-        <button @click="$emit('view-logs', robot.id)" class="action-btn secondary-btn">
-          <span class="btn-icon">📊</span>
-          Logs
-        </button>
-        <button @click="$emit('delete', robot.id)" class="action-btn danger-btn">
-          <span class="btn-icon">🗑️</span>
-          Delete
-        </button>
-      </div>
-      
-      <div v-if="mode === 'museum'" class="secondary-actions">
-        <button @click="$emit('view-logs', robot.id)" class="action-btn secondary-btn">
-          <span class="btn-icon">📊</span>
-          View Logs
-        </button>
+        <button 
+          @click="$emit('view-workspace-logs', robot.id)" 
+          :disabled="robot.status === 'OFFLINE'"
+          class="action-btn secondary-btn"
+        >
+          <span class="btn-icon">📋</span>
+          Workspace Logs        </button>
       </div>
     </div>
   </div>
@@ -125,11 +151,23 @@ export default {
       default: 'museum', // 'admin' or 'museum'
       validator: value => ['admin', 'museum'].includes(value)
     }
-  },
-  methods: {
+  },  methods: {
     formatTime(timestamp) {
       if (!timestamp) return 'Never'
       return new Date(timestamp).toLocaleTimeString()
+    },
+    
+    formatUptime(seconds) {
+      if (!seconds || seconds === 0) return '0m'
+      
+      const hours = Math.floor(seconds / 3600)
+      const minutes = Math.floor((seconds % 3600) / 60)
+      
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`
+      } else {
+        return `${minutes}m`
+      }
     }
   }
 }
@@ -271,9 +309,9 @@ export default {
 
 .robot-metrics {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin: 1.5rem 0;
 }
 
 .robot-card.admin .robot-metrics {
@@ -426,6 +464,37 @@ export default {
 
 .btn-icon {
   font-size: 1rem;
+}
+
+/* New metric card styles for essential data */
+.connectivity-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.status-item {
+  font-size: 0.75rem;
+  color: var(--danger-red);
+  font-weight: 500;
+}
+
+.status-item.connected {
+  color: var(--success-green);
+}
+
+.metric-card.cpu-temp .metric-value {
+  font-size: 0.875rem;
+}
+
+.metric-card.workspace .metric-value.running {
+  color: var(--success-green);
+  font-weight: 600;
+}
+
+.metric-card.workspace .metric-value.stopped {
+  color: var(--warning-orange);
+  font-weight: 600;
 }
 
 /* Responsive Design */

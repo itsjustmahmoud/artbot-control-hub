@@ -9,15 +9,14 @@
     />
 
     <!-- Status Overview -->
-    <StatusOverview :status-cards="statusCards" />
-
-    <!-- Robot Fleet -->
+    <StatusOverview :status-cards="statusCards" />    <!-- Robot Fleet -->
     <RobotsGrid
       title="🤖 Robot Fleet Management"
       :robots="safeRobots"
       :is-loading="isLoading"
       mode="museum"
-      @robot-command="sendCommand"
+      @workspace-start="startWorkspace"
+      @workspace-stop="stopWorkspace"
       @view-logs="viewLogs"
     />
 
@@ -100,21 +99,25 @@ export default {
     offlineRobotsCount() {
       return this.safeRobots.filter(robot => robot.status === 'OFFLINE').length
     },
+      runningWorkspacesCount() {
+      return this.safeRobots.filter(robot => robot.workspace_status === 'running').length
+    },
     
-    connectedAgentsCount() {
-      return this.safeRobots.filter(robot => robot.status !== 'OFFLINE').length
+    connectedCreate3Count() {
+      return this.safeRobots.filter(robot => robot.create3_connected).length
     },
     
     statusCards() {
       return [
         {
-          id: 'active-robots',
-          type: 'active-robots',
-          icon: '🟢',
-          title: 'Active Robots',
-          value: this.activeRobotsCount,
-          subtitle: 'Currently operational'
-        },        {
+          id: 'workspace-running',
+          type: 'workspace-running',
+          icon: '⚙️',
+          title: 'Running Workspaces',
+          value: this.runningWorkspacesCount,
+          subtitle: 'Active workspaces'
+        },
+        {
           id: 'system-health',
           type: 'system-health',
           icon: this.systemStatus === 'HEALTHY' ? '💚' : this.systemStatus === 'WARNING' ? '⚠️' : '🔴',
@@ -123,20 +126,20 @@ export default {
           subtitle: 'Overall system status'
         },
         {
-          id: 'connected-agents',
-          type: 'connected-agents',
-          icon: '🔗',
-          title: 'Connected Agents',
-          value: this.connectedAgentsCount,
-          subtitle: 'Agents online'
+          id: 'connected-create3',
+          type: 'connected-create3',
+          icon: '🤖',
+          title: 'Connected Create3',
+          value: this.connectedCreate3Count,
+          subtitle: 'Create3 robots online'
         },
         {
-          id: 'uptime',
-          type: 'uptime',
-          icon: '⏱️',
-          title: 'System Uptime',
-          value: '24h 16m',
-          subtitle: 'Since last restart'
+          id: 'total-robots',
+          type: 'total-robots',
+          icon: '📱',
+          title: 'Total Robots',
+          value: this.robotsList.length,
+          subtitle: 'Fleet size'
         }
       ]
     }
@@ -145,10 +148,35 @@ export default {
   methods: {
     ...mapActions(useRobotsStore, ['sendCommand', 'fetchRobots']),
     ...mapActions(useAuthStore, ['logout']),
-    
-    handleLogout() {
+      handleLogout() {
       this.logout()
       this.$router.push('/')
+    },
+    
+    async startWorkspace(robotId) {
+      try {
+        await this.sendWorkspaceCommand(robotId, 'start')
+        this.$toast?.success(`Started workspace on robot ${robotId}`)
+      } catch (error) {
+        console.error('Failed to start workspace:', error)
+        this.$toast?.error(`Failed to start workspace on robot ${robotId}`)
+      }
+    },
+    
+    async stopWorkspace(robotId) {
+      try {
+        await this.sendWorkspaceCommand(robotId, 'stop')
+        this.$toast?.success(`Stopped workspace on robot ${robotId}`)
+      } catch (error) {
+        console.error('Failed to stop workspace:', error)
+        this.$toast?.error(`Failed to stop workspace on robot ${robotId}`)
+      }
+    },
+    
+    async sendWorkspaceCommand(robotId, action) {
+      // This method will be implemented in the robots store
+      const robotsStore = useRobotsStore()
+      return await robotsStore.sendWorkspaceCommand(robotId, action)
     },
     
     viewLogs(robotId) {
