@@ -83,16 +83,33 @@ class RobotManager:
             # Log the status change
             self.logging_service.add_robot_log(robot_id, {
                 "level": "INFO",
-                "message": f"Status changed to {status}" + (f" with action {action}" if action else ""),
-                "source": "robot_manager"
+                "message": f"Status changed to {status}" + (f" with action {action}" if action else ""),                "source": "robot_manager"
             })
         
         return success
     
     # Agent Registry Methods
     def register_agent(self, agent_id: str, agent_info: dict):
-        """Register a new agent"""
+        """Register a new agent and create corresponding robot entry"""
+        logger.info(f"Registering agent {agent_id} with info: {agent_info}")
+        
         agent_data = self.agent_registry.register_agent(agent_id, agent_info)
+        
+        # Also register this agent as a robot in the robot registry
+        robot_info = {
+            "name": agent_info.get("hostname", f"Robot {agent_id}"),
+            "ip_address": agent_info.get("ip_address", "unknown"),
+            "battery_level": 100,  # Default, will be updated by heartbeat
+            "cpu_usage": 0,        # Default, will be updated by heartbeat
+            "memory_usage": 0,     # Default, will be updated by heartbeat
+            "temperature": 25,     # Default, will be updated by heartbeat
+            "location": "Museum",  # Default location
+            "capabilities": agent_info.get("robot_info", {}).get("capabilities", [])
+        }
+        
+        logger.info(f"Creating robot entry for agent {agent_id} with data: {robot_info}")
+        robot_data = self.register_robot(agent_id, robot_info)
+        logger.info(f"Robot registered successfully: {robot_data}")
         
         # Log the registration
         self.logging_service.add_system_log({
@@ -104,13 +121,34 @@ class RobotManager:
         return agent_data
     
     def update_agent_heartbeat(self, agent_id: str, data: dict = None):
-        """Update agent heartbeat"""
+        """Update agent heartbeat and robot status"""
         success = self.agent_registry.update_agent_heartbeat(agent_id, data)
         
         if success and data:
-            # If robot status is included in heartbeat, update robot registry
-            if "robot_status" in data:
-                self.update_robot_status(agent_id, data["robot_status"])
+            # Extract robot metrics from heartbeat data and update robot registry
+            robot_update = {}
+            
+            # Map agent heartbeat data to robot fields
+            if "cpu_percent" in data:
+                robot_update["cpu_usage"] = data["cpu_percent"]
+            if "memory_percent" in data:
+                robot_update["memory_usage"] = data["memory_percent"]
+            if "temperature" in data:
+                robot_update["temperature"] = data["temperature"]
+            if "battery_level" in data:
+                robot_update["battery_level"] = data["battery_level"]
+            if "workspace_running" in data:
+                robot_update["current_action"] = "person_following" if data["workspace_running"] else "idle"
+            if "create3_connected" in data:
+                robot_update["create3_connected"] = data["create3_connected"]
+            if "oak_connected" in data:
+                robot_update["oak_connected"] = data["oak_connected"]
+            if "uptime" in data:
+                robot_update["uptime"] = data["uptime"]
+                
+            # Update robot status if we have metrics
+            if robot_update:
+                self.update_robot_status(agent_id, robot_update)
         
         return success
     

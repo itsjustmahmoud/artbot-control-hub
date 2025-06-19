@@ -56,7 +56,7 @@ curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main
 #### ⚡ Quick Test Installation
 ```bash
 # Replace 192.168.0.201 with your hub IP
-curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/scripts/quick-install.sh | bash -s 192.168.0.201
+curl -sSL https://raw.githubusercontent.com/itsjustmahmoud/artbot-control-hub/main/scripts/quick-install.sh | bash -s 192.168.0.201
 ```
 
 #### 🔍 Finding Your Hub IP Address
