@@ -1,8 +1,23 @@
 import axios from 'axios'
 
+// Determine the correct API base URL
+const getApiBaseUrl = () => {
+  // If we're accessing via network IP, use that IP for the backend too
+  const hostname = window.location.hostname
+  const port = window.location.port
+  
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    // Local access - use proxy
+    return '/api'
+  } else {
+    // Network access - directly target the backend
+    return `http://${hostname}:8000/api`
+  }
+}
+
 // Create axios instance with base configuration
 const apiClient = axios.create({
-  baseURL: '/api',
+  baseURL: getApiBaseUrl(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'

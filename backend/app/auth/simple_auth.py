@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-import jwt
+import jwt  # PyJWT
 import hashlib
 from app.config import settings
 

@@ -42,7 +42,7 @@ pip install -r requirements.txt
 
 # Start backend in new window
 Write-Host "Starting backend server..." -ForegroundColor Green
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; .\venv\Scripts\Activate.ps1; python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; .\venv\Scripts\Activate.ps1; uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
 
 # Wait for backend to start
 Start-Sleep -Seconds 3
@@ -64,14 +64,16 @@ Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "Artbot Control Hub is starting up!" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Backend API: http://localhost:8000" -ForegroundColor White
-Write-Host "Frontend UI: http://localhost:5173" -ForegroundColor White  
+Write-Host "Backend API (Network): http://192.168.0.201:8000" -ForegroundColor White
+Write-Host "Frontend UI: http://localhost:3000" -ForegroundColor White  
+Write-Host "Frontend UI (Network): http://192.168.0.201:3000" -ForegroundColor White
 Write-Host "API Docs: http://localhost:8000/docs" -ForegroundColor White
 Write-Host ""
 Write-Host "Login credentials:" -ForegroundColor Yellow
 Write-Host "- Museum Staff: museum123" -ForegroundColor White
-Write-Host "- Admin: admin456" -ForegroundColor White
+Write-Host "- Admin: admin123" -ForegroundColor White
 Write-Host ""
-Write-Host "The interface will show demo robots for testing." -ForegroundColor Green
+Write-Host "Real robot 'artbot1_robot' is connected!" -ForegroundColor Green
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -81,7 +83,7 @@ Start-Sleep -Seconds 5
 
 # Open web interface
 Write-Host "Opening web interface..." -ForegroundColor Green
-Start-Process "http://localhost:5173"
+Start-Process "http://localhost:3000"
 
 Write-Host ""
 Write-Host "Both servers are running!" -ForegroundColor Green

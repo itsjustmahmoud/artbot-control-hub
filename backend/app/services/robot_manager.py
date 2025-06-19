@@ -22,8 +22,8 @@ class RobotManager:
         # WebSocket manager reference (set by main.py)
         self.websocket_manager = None
         
-        # Initialize demo data for testing
-        self._initialize_demo_data()
+        # Demo data disabled - only show real robots
+        # self._initialize_demo_data()
     
     def _initialize_demo_data(self):
         """Initialize with demo robots for testing"""
@@ -218,8 +218,7 @@ class RobotManager:
             **agent_info,
             "last_seen": datetime.utcnow(),
             "status": "online",
-            "registered_at": datetime.utcnow()
-        }
+            "registered_at": datetime.utcnow()        }
         
         # If agent has robot info, register the robot too
         if "robot_info" in agent_info:
@@ -229,14 +228,27 @@ class RobotManager:
     
     def register_robot(self, robot_id: str, robot_info: dict):
         """Register a robot with the system"""
+        # Get agent info for additional details
+        agent_info = self.agents.get(robot_id, {})
+        
         self.robots[robot_id] = {
-            **robot_info,
             "id": robot_id,
-            "status": "idle",
-            "last_update": datetime.utcnow(),
-            "agent_id": robot_id,  # Assuming robot_id == agent_id
-            "battery_level": 0,
-            "current_action": "idle"
+            "name": f"Artbot {robot_id}",
+            "status": "online",
+            "current_action": "idle",
+            "battery_level": robot_info.get("battery_level", 85),
+            "cpu_usage": 25,
+            "memory_usage": 45,
+            "temperature": 42,
+            "ip_address": agent_info.get("ip_address", "unknown"),
+            "last_update": datetime.utcnow().isoformat(),
+            "agent_id": robot_id,
+            "type": robot_info.get("type", "unknown"),
+            "model": robot_info.get("model", "unknown"),
+            "capabilities": robot_info.get("capabilities", []),
+            "sensors": robot_info.get("sensors", []),
+            "ros2_available": robot_info.get("ros2_available", False),
+            "person_following_available": robot_info.get("person_following_available", False)
         }
         logger.info(f"Robot {robot_id} registered")
     

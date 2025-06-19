@@ -8,17 +8,19 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
-  },
-  server: {
+  },  server: {
+    host: '0.0.0.0',
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        secure: false
       },
       '/ws': {
-        target: 'ws://localhost:8000',
-        ws: true
+        target: 'ws://127.0.0.1:8000',
+        ws: true,
+        changeOrigin: true
       }
     }
   },
