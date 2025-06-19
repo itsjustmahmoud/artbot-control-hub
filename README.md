@@ -43,6 +43,32 @@ cd artbot-control-hub
 ```
 
 ### Agent Deployment (Raspberry Pi)
+
+#### 🚀 One-Liner Installation (Recommended)
+```bash
+# Replace YOUR_HUB_IP with your control hub computer's IP address
+curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/install-agent.sh | bash
+```
+
+#### ⚡ Quick Test Installation
+```bash
+# Replace 192.168.0.201 with your hub IP
+curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/quick-install.sh | bash -s 192.168.0.201
+```
+
+#### 🔍 Finding Your Hub IP Address
+
+**On Windows:**
+```powershell
+ipconfig | findstr "IPv4"
+```
+
+**On Mac/Linux:**
+```bash
+hostname -I | awk '{print $1}'
+```
+
+#### 📋 Manual Installation
 ```bash
 # On your robot/Pi
 git clone https://github.com/yourusername/artbot-control-hub.git
