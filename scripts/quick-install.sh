@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Quick Artbot Agent Setup (No systemd service)
-# Usage: curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/scripts/quick-install.sh | bash -s YOUR_HUB_IP
+# Usage: curl -sSL https://raw.githubusercontent.com/itsjustmahmoud/artbot-control-hub/main/scripts/quick-install.sh | bash -s YOUR_HUB_IP
 
 set -e
 
@@ -16,7 +16,7 @@ NC='\033[0m'
 echo -e "${BLUE}🚀 Artbot Agent Quick Setup${NC}"
 
 if [[ -z "$HUB_IP" ]]; then
-    echo -e "${YELLOW}Usage: curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/scripts/quick-install.sh | bash -s YOUR_HUB_IP${NC}"
+    echo -e "${YELLOW}Usage: curl -sSL https://raw.githubusercontent.com/itsjustmahmoud/artbot-control-hub/main/scripts/quick-install.sh | bash -s YOUR_HUB_IP${NC}"
     exit 1
 fi
 
@@ -29,7 +29,7 @@ sudo apt-get update -qq && sudo apt-get install -y git python3 python3-pip > /de
 rm -rf ~/artbot-control-hub
 
 # Clone and setup
-git clone https://github.com/yourusername/artbot-control-hub.git ~/artbot-control-hub > /dev/null 2>&1
+git clone https://github.com/itsjustmahmoud/artbot-control-hub.git ~/artbot-control-hub > /dev/null 2>&1
 cd ~/artbot-control-hub/agent
 
 # Install deps

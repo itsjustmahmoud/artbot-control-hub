@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Artbot Control Hub - Agent Auto-Installer
-# Usage: curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/scripts/install-agent.sh | bash
+# Usage: curl -sSL https://raw.githubusercontent.com/itsjustmahmoud/artbot-control-hub/main/scripts/install-agent.sh | bash
 
 set -e
 
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-REPO_URL="https://github.com/yourusername/artbot-control-hub.git"
+REPO_URL="https://github.com/itsjustmahmoud/artbot-control-hub.git"
 INSTALL_DIR="$HOME/artbot-control-hub"
 AGENT_DIR="$INSTALL_DIR/agent"
 
