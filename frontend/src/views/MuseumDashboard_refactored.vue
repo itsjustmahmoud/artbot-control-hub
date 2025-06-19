@@ -114,12 +114,13 @@ export default {
           title: 'Active Robots',
           value: this.activeRobotsCount,
           subtitle: 'Currently operational'
-        },        {
+        },
+        {
           id: 'system-health',
           type: 'system-health',
           icon: this.systemStatus === 'HEALTHY' ? '💚' : this.systemStatus === 'WARNING' ? '⚠️' : '🔴',
           title: 'System Health',
-          value: this.systemStatus === 'HEALTHY' ? 'Good' : this.systemStatus,
+          value: this.systemStatus,
           subtitle: 'Overall system status'
         },
         {
