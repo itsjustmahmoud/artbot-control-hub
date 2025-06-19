@@ -115,42 +115,54 @@ class RobotManager:
         self.logging_service.add_system_log({
             "level": "INFO",
             "message": f"Agent {agent_id} registered from {agent_info.get('ip_address', 'unknown')}",
-            "component": "robot_manager"
-        })
+            "component": "robot_manager"        })
         
         return agent_data
     
     def update_agent_heartbeat(self, agent_id: str, data: dict = None):
         """Update agent heartbeat and robot status"""
-        success = self.agent_registry.update_agent_heartbeat(agent_id, data)
+        logger.debug(f"Processing heartbeat for agent {agent_id} with data: {data}")
         
-        if success and data:
-            # Extract robot metrics from heartbeat data and update robot registry
-            robot_update = {}
+        try:
+            success = self.agent_registry.update_agent_heartbeat(agent_id, data)
+            logger.debug(f"Agent registry update success: {success}")
             
-            # Map agent heartbeat data to robot fields
-            if "cpu_percent" in data:
-                robot_update["cpu_usage"] = data["cpu_percent"]
-            if "memory_percent" in data:
-                robot_update["memory_usage"] = data["memory_percent"]
-            if "temperature" in data:
-                robot_update["temperature"] = data["temperature"]
-            if "battery_level" in data:
-                robot_update["battery_level"] = data["battery_level"]
-            if "workspace_running" in data:
-                robot_update["current_action"] = "person_following" if data["workspace_running"] else "idle"
-            if "create3_connected" in data:
-                robot_update["create3_connected"] = data["create3_connected"]
-            if "oak_connected" in data:
-                robot_update["oak_connected"] = data["oak_connected"]
-            if "uptime" in data:
-                robot_update["uptime"] = data["uptime"]
+            if success and data:
+                # Extract robot metrics from heartbeat data and update robot registry
+                robot_update = {}
                 
-            # Update robot status if we have metrics
-            if robot_update:
-                self.update_robot_status(agent_id, robot_update)
-        
-        return success
+                # Map agent heartbeat data to robot fields
+                if "cpu_percent" in data:
+                    robot_update["cpu_usage"] = data["cpu_percent"]
+                if "memory_percent" in data:
+                    robot_update["memory_usage"] = data["memory_percent"]
+                if "temperature" in data:
+                    robot_update["temperature"] = data["temperature"]
+                if "battery_level" in data:
+                    robot_update["battery_level"] = data["battery_level"]
+                if "workspace_running" in data:
+                    robot_update["current_action"] = "person_following" if data["workspace_running"] else "idle"
+                if "create3_connected" in data:
+                    robot_update["create3_connected"] = data["create3_connected"]
+                if "oak_connected" in data:
+                    robot_update["oak_connected"] = data["oak_connected"]
+                if "uptime" in data:
+                    robot_update["uptime"] = data["uptime"]
+                    
+                logger.debug(f"Robot update data: {robot_update}")
+                
+                # Update robot status if we have metrics
+                if robot_update:
+                    robot_success = self.update_robot_status(agent_id, robot_update)
+                    logger.debug(f"Robot status update success: {robot_success}")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error in update_agent_heartbeat for {agent_id}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
     
     def get_agent(self, agent_id: str) -> Optional[dict]:
         """Get specific agent information"""

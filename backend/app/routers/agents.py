@@ -52,6 +52,7 @@ async def register_agent(agent_data: AgentRegistration):
 async def agent_heartbeat(agent_id: str, data: Dict[str, Any] = {}):
     """Update agent heartbeat and status"""
     try:
+        logger.debug(f"Received heartbeat from {agent_id}: {data}")
         robot_manager.update_agent_heartbeat(agent_id, data)
         
         return {
@@ -62,6 +63,9 @@ async def agent_heartbeat(agent_id: str, data: Dict[str, Any] = {}):
     
     except Exception as e:
         logger.error(f"Heartbeat error for agent {agent_id}: {e}")
+        logger.error(f"Heartbeat data: {data}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Heartbeat processing failed: {str(e)}"

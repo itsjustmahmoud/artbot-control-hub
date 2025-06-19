@@ -14,6 +14,107 @@ class SystemMonitor:
         self.start_time = datetime.utcnow()
         self.last_metrics = {}
     
+    async def get_essential_metrics(self):
+        """Get only the essential metrics requested by user"""
+        try:
+            import psutil
+            import subprocess
+            
+            # 1. CPU usage and temperature
+            cpu_percent = psutil.cpu_percent(interval=1)
+            
+            temperature = None
+            try:
+                with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
+                    temp_raw = int(f.read().strip())
+                    temperature = temp_raw / 1000.0  # Convert to Celsius
+            except:
+                temperature = 40  # Default fallback
+            
+            # 2. Memory usage
+            memory = psutil.virtual_memory()
+            memory_percent = memory.percent
+            
+            # 3. OAK camera connectivity check
+            oak_connected = False
+            try:
+                # Check if camera device exists or depthai processes
+                oak_connected = (
+                    os.path.exists('/dev/video0') or 
+                    os.path.exists('/dev/dri/card0') or
+                    len(subprocess.run(["pgrep", "-f", "depthai"], capture_output=True).stdout) > 0
+                )
+            except:
+                pass
+            
+            # 4. Create3 connectivity and battery
+            create3_connected = False
+            battery_level = 0
+            try:
+                # Try to ping Create3 IP
+                create3_ip = os.getenv("CREATE3_IP", "192.168.186.2")
+                result = subprocess.run(
+                    ["ping", "-c", "1", "-W", "1", create3_ip],
+                    capture_output=True,
+                    timeout=2
+                )
+                create3_connected = result.returncode == 0
+                
+                # Get battery level if connected
+                if create3_connected:
+                    try:
+                        import requests
+                        response = requests.get(f'http://{create3_ip}/api/battery', timeout=2)
+                        if response.status_code == 200:
+                            battery_data = response.json()
+                            battery_level = battery_data.get('level', 0)
+                    except:
+                        battery_level = 85  # Default fallback
+            except:
+                pass
+            
+            # 5. Workspace run status
+            workspace_running = False
+            try:
+                result = subprocess.run(
+                    ["pgrep", "-f", "workspace run"],
+                    capture_output=True,
+                    text=True
+                )
+                workspace_running = result.returncode == 0
+            except:
+                pass
+            
+            # 6. Robot uptime (time since agent started)
+            uptime_seconds = (datetime.utcnow() - self.start_time).total_seconds()
+            
+            return {
+                "timestamp": datetime.utcnow().isoformat(),
+                "cpu_percent": round(cpu_percent, 1),
+                "temperature": round(temperature, 1),
+                "memory_percent": round(memory_percent, 1),
+                "oak_connected": oak_connected,
+                "create3_connected": create3_connected,
+                "battery_level": battery_level,
+                "workspace_running": workspace_running,
+                "uptime": int(uptime_seconds)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting essential metrics: {e}")
+            return {
+                "timestamp": datetime.utcnow().isoformat(),
+                "cpu_percent": 0,
+                "temperature": 40,
+                "memory_percent": 0,
+                "oak_connected": False,
+                "create3_connected": False,
+                "battery_level": 0,
+                "workspace_running": False,
+                "uptime": 0,
+                "error": str(e)
+            }
+
     async def get_system_metrics(self):
         """Get comprehensive system metrics"""
         try:
@@ -79,7 +180,7 @@ class SystemMonitor:
         except Exception as e:
             logger.error(f"Error getting system metrics: {e}")
             return {"error": str(e), "timestamp": datetime.utcnow().isoformat()}
-    
+
     async def get_robot_metrics(self):
         """Get robot-specific metrics"""
         try:
@@ -89,7 +190,8 @@ class SystemMonitor:
             result = subprocess.run(
                 ["pgrep", "-f", self.config.ros2_package],
                 capture_output=True,
-                text=True            )
+                text=True
+            )
             
             is_running = result.returncode == 0
             processes = result.stdout.strip().split('\n') if is_running else []
@@ -132,7 +234,7 @@ class SystemMonitor:
         except Exception as e:
             logger.error(f"Error getting robot metrics: {e}")
             return {"error": str(e), "timestamp": datetime.utcnow().isoformat()}
-    
+
     async def collect_metrics(self):
         """Collect all metrics"""
         try:
@@ -155,32 +257,39 @@ class SystemMonitor:
         except Exception as e:
             logger.error(f"Error collecting metrics: {e}")
             return {"error": str(e), "timestamp": datetime.utcnow().isoformat()}
-    
+
     async def monitor_loop(self):
         """Main monitoring loop"""
         while self.running:
             try:
                 metrics = await self.collect_metrics()
+                logger.debug(f"Collected metrics: {metrics}")
                 
-                # Store latest metrics
-                self.last_metrics = metrics
-                
-                # You can add additional processing here
-                # e.g., send to hub, store locally, etc.
+                # Wait for next collection interval
+                await asyncio.sleep(self.config.monitor_interval)
                 
             except Exception as e:
-                logger.error(f"Monitoring error: {e}")
-            
-            await asyncio.sleep(self.config.monitor_interval)
-    
+                logger.error(f"Monitoring loop error: {e}")
+                await asyncio.sleep(self.config.monitor_interval)
+
     async def start(self):
-        """Start system monitoring"""
+        """Start monitoring loop"""
         self.running = True
-        self.last_metrics = {}
-        self.start_time = datetime.utcnow()
-        
         logger.info(f"Starting system monitoring every {self.config.monitor_interval} seconds")
-        await self.monitor_loop()
+        
+        while self.running:
+            try:
+                # Collect essential metrics and store them
+                self.last_metrics = await self.get_essential_metrics()
+                
+                # Wait for next collection interval
+                await asyncio.sleep(self.config.monitor_interval)
+                
+            except Exception as e:
+                logger.error(f"System monitoring error: {e}")
+                await asyncio.sleep(self.config.monitor_interval)
+        
+        logger.info("System monitoring stopped")
     
     def stop(self):
         """Stop monitoring"""
@@ -189,112 +298,3 @@ class SystemMonitor:
     def get_last_metrics(self):
         """Get the last collected metrics"""
         return getattr(self, 'last_metrics', {})
-    
-    async def get_essential_metrics(self):
-        """Get only the essential metrics requested by user"""
-        try:
-            import psutil
-            import subprocess
-            import os
-            
-            # 1. CPU usage and temperature
-            cpu_usage = psutil.cpu_percent(interval=1)
-            
-            temperature = None
-            try:
-                with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
-                    temp_raw = int(f.read().strip())
-                    temperature = temp_raw / 1000.0  # Convert to Celsius
-            except:
-                temperature = 40  # Default fallback
-            
-            # 2. Memory usage
-            memory = psutil.virtual_memory()
-            memory_usage = memory.percent
-            
-            # 3. OAK camera connectivity check
-            oak_camera_connected = False
-            try:
-                # Check if camera device exists or depthai processes
-                oak_camera_connected = (
-                    os.path.exists('/dev/video0') or 
-                    os.path.exists('/dev/dri/card0') or
-                    len(subprocess.run(["pgrep", "-f", "depthai"], capture_output=True).stdout) > 0
-                )
-            except:
-                pass
-              # 4. Create3 connectivity and battery
-            create3_connected = False
-            battery_level = 0
-            try:
-                # Try to ping Create3 IP
-                create3_ip = os.getenv("CREATE3_IP", "192.168.186.2")
-                result = subprocess.run(
-                    ["ping", "-c", "1", "-W", "1", create3_ip],
-                    capture_output=True,
-                    timeout=2
-                )
-                create3_connected = result.returncode == 0
-                
-                # Get battery level if connected
-                if create3_connected:
-                    try:
-                        import requests
-                        response = requests.get(f'http://{create3_ip}/api/battery', timeout=2)
-                        if response.status_code == 200:
-                            battery_data = response.json()
-                            battery_level = battery_data.get('level', 0)
-                    except:
-                        battery_level = 85  # Default fallback
-            except:
-                pass
-            
-            # 5. Robot Name/ID and Pi hostname
-            robot_name = self.config.agent_id
-            hostname = self.config.hostname
-            
-            # 6. Workspace run status
-            workspace_status = "stopped"
-            try:
-                result = subprocess.run(
-                    ["pgrep", "-f", "workspace run"],
-                    capture_output=True,
-                    text=True
-                )
-                workspace_status = "running" if result.returncode == 0 else "stopped"
-            except:
-                pass
-            
-            # 7. Robot uptime (time since agent started)
-            uptime_seconds = (datetime.utcnow() - self.start_time).total_seconds()
-            
-            return {
-                "timestamp": datetime.utcnow().isoformat(),
-                "robot_name": robot_name,
-                "hostname": hostname,
-                "cpu_usage": round(cpu_usage, 1),
-                "temperature": round(temperature, 1),
-                "memory_usage": round(memory_usage, 1),
-                "oak_camera_connected": oak_camera_connected,
-                "create3_connected": create3_connected,
-                "battery_level": battery_level,
-                "workspace_status": workspace_status,
-                "uptime_seconds": int(uptime_seconds)
-            }
-            
-        except Exception as e:
-            logger.error(f"Error getting essential metrics: {e}")
-            return {
-                "timestamp": datetime.utcnow().isoformat(),
-                "robot_name": getattr(self.config, 'agent_id', 'unknown'),
-                "hostname": getattr(self.config, 'hostname', 'unknown'), 
-                "cpu_usage": 0,
-                "temperature": 40,
-                "memory_usage": 0,
-                "oak_camera_connected": False,
-                "create3_connected": False,
-                "battery_level": 0,
-                "workspace_status": "unknown",
-                "uptime_seconds": 0,
-                "error": str(e)
-            }
