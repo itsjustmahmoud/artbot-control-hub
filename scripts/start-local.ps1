@@ -24,7 +24,7 @@ Write-Host ""
 
 # Setup backend
 Write-Host "Setting up backend..." -ForegroundColor Yellow
-Set-Location "$PSScriptRoot\backend"
+Set-Location "$PSScriptRoot\..\backend"
 
 # Create virtual environment if it doesn't exist
 if (!(Test-Path "venv")) {
@@ -49,7 +49,7 @@ Start-Sleep -Seconds 3
 
 # Setup frontend
 Write-Host "Setting up frontend..." -ForegroundColor Yellow
-Set-Location "$PSScriptRoot\frontend"
+Set-Location "$PSScriptRoot\..\frontend"
 
 # Install frontend dependencies
 Write-Host "Installing frontend dependencies..." -ForegroundColor Yellow

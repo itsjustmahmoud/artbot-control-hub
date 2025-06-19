@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Artbot Control Hub - Agent Auto-Installer
-# Usage: curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/install-agent.sh | bash
+# Usage: curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/scripts/install-agent.sh | bash
 
 set -e
 

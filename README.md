@@ -38,8 +38,11 @@ A modern, real-time, web-based control system for managing museum exhibition rob
 git clone https://github.com/yourusername/artbot-control-hub.git
 cd artbot-control-hub
 
-# Start the full stack
-.\start-local.ps1
+# Windows: Start the full stack
+.\scripts\start-local.ps1
+
+# Linux/Mac: Start the full stack
+./start.sh
 ```
 
 ### Agent Deployment (Raspberry Pi)
@@ -47,13 +50,13 @@ cd artbot-control-hub
 #### 🚀 One-Liner Installation (Recommended)
 ```bash
 # Replace YOUR_HUB_IP with your control hub computer's IP address
-curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/install-agent.sh | bash
+curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/scripts/install-agent.sh | bash
 ```
 
 #### ⚡ Quick Test Installation
 ```bash
 # Replace 192.168.0.201 with your hub IP
-curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/quick-install.sh | bash -s 192.168.0.201
+curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/scripts/quick-install.sh | bash -s 192.168.0.201
 ```
 
 #### 🔍 Finding Your Hub IP Address
@@ -103,24 +106,32 @@ HEARTBEAT_INTERVAL=30
 
 ```
 artbot-control-hub/
-├── backend/           # FastAPI backend
+├── backend/              # FastAPI backend
 │   ├── app/
-│   │   ├── routers/   # API endpoints
-│   │   ├── services/  # Business logic
-│   │   └── auth/      # Authentication
+│   │   ├── routers/      # API endpoints
+│   │   ├── services/     # Business logic
+│   │   └── auth/         # Authentication
 │   └── requirements.txt
-├── frontend/          # Vue 3 frontend
+├── frontend/             # Vue 3 frontend
 │   ├── src/
-│   │   ├── views/     # Dashboard pages
-│   │   ├── stores/    # State management
-│   │   └── services/  # API clients
+│   │   ├── views/        # Dashboard pages
+│   │   ├── stores/       # State management
+│   │   └── services/     # API clients
 │   └── package.json
-├── agent/             # Robot agent
+├── agent/                # Robot agent
 │   ├── artbot_agent/
-│   │   ├── main.py    # Agent entry point
-│   │   └── services/  # Agent services
+│   │   ├── main.py       # Agent entry point
+│   │   └── services/     # Agent services
 │   └── requirements.txt
-└── docs/              # Documentation
+├── scripts/              # Installation & startup scripts
+│   ├── install-agent.sh  # Pi agent installer
+│   ├── quick-install.sh  # Quick Pi setup
+│   └── start-local.ps1   # Windows development
+├── docs/                 # Documentation
+│   ├── API.md           # API reference
+│   └── DEPLOYMENT.md    # Deployment guide
+├── deployment/           # Docker configurations
+└── start.sh             # Linux/Mac development
 ```
 
 ## 🎯 Access Levels
@@ -159,10 +170,11 @@ python -m artbot_agent.main
 
 ## 📖 Documentation
 
-- [Installation Guide](docs/INSTALLATION.md)
-- [Deployment Guide](docs/DEPLOYMENT.md)
 - [API Documentation](docs/API.md)
-- [Local Setup](docs/LOCAL_SETUP.md)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+- [Local Setup Guide](docs/LOCAL_SETUP.md)
+- [Implementation Status](docs/IMPLEMENTATION_STATUS.md)
+- [PowerShell Troubleshooting](docs/POWERSHELL_FIX.md)
 
 ## 🤝 Contributing
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Quick Artbot Agent Setup (No systemd service)
-# Usage: curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/quick-install.sh | bash -s YOUR_HUB_IP
+# Usage: curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/scripts/quick-install.sh | bash -s YOUR_HUB_IP
 
 set -e
 
@@ -16,7 +16,7 @@ NC='\033[0m'
 echo -e "${BLUE}🚀 Artbot Agent Quick Setup${NC}"
 
 if [[ -z "$HUB_IP" ]]; then
-    echo -e "${YELLOW}Usage: curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/quick-install.sh | bash -s YOUR_HUB_IP${NC}"
+    echo -e "${YELLOW}Usage: curl -sSL https://raw.githubusercontent.com/yourusername/artbot-control-hub/main/scripts/quick-install.sh | bash -s YOUR_HUB_IP${NC}"
     exit 1
 fi
 
