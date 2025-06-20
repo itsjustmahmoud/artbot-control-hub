@@ -394,9 +394,10 @@ async def get_robot_metrics(robot_id: str, user: Dict[str, Any] = Depends(requir
         "oak_camera_connected": robot.get("oak_connected"),
         "create3_connected": robot.get("create3_connected"),
         "create3_status": robot.get("create3_status"),
-        
-        # Robot Status & Metrics
+          # Robot Status & Metrics
         "battery_level": robot.get("battery_level"),
+        "is_charging": robot.get("is_charging"),
+        "is_docked": robot.get("is_docked"),
         "workspace_running": robot.get("workspace_running"),
         "current_action": robot.get("current_action"),
         "uptime": robot.get("uptime"),

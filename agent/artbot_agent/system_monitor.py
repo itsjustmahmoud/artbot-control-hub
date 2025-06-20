@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime
+from .create3_monitor import get_create3_status
 
 logger = logging.getLogger(__name__)
 
@@ -46,42 +47,14 @@ class SystemMonitor:
                 )
             except:
                 pass
-              # 4. Create3 connectivity and battery
-            create3_connected = False
-            battery_level = 0
-            create3_status = "unknown"
-            try:
-                # Try to ping Create3 IP
-                create3_ip = os.getenv("CREATE3_IP", "192.168.186.2")
-                result = subprocess.run(
-                    ["ping", "-c", "1", "-W", "1", create3_ip],
-                    capture_output=True,
-                    timeout=2
-                )
-                create3_connected = result.returncode == 0
-                
-                # Get battery level and status if connected
-                if create3_connected:
-                    try:
-                        import requests
-                        # Get battery status
-                        response = requests.get(f'http://{create3_ip}/api/battery', timeout=2)
-                        if response.status_code == 200:
-                            battery_data = response.json()
-                            battery_level = battery_data.get('level', 0)
-                        
-                        # Get robot status
-                        status_response = requests.get(f'http://{create3_ip}/api/robot_state', timeout=2)
-                        if status_response.status_code == 200:
-                            state_data = status_response.json()
-                            create3_status = state_data.get('state', 'unknown')
-                        else:
-                            create3_status = "connected"
-                    except:
-                        battery_level = 85  # Default fallback
-                        create3_status = "connected"
-            except:
-                pass
+            
+            # 4. Create3 connectivity and battery using ROS2
+            create3_status = await get_create3_status()
+            create3_connected = create3_status.get('connected', False)
+            battery_level = create3_status.get('battery_level', 0)
+            create3_state = create3_status.get('status', 'unknown')
+            is_charging = create3_status.get('is_charging', False)
+            is_docked = create3_status.get('is_docked', False)
             
             # 5. Workspace run status
             workspace_running = False
@@ -94,7 +67,8 @@ class SystemMonitor:
                 workspace_running = result.returncode == 0
             except:
                 pass
-              # 6. Robot uptime (time since agent started)
+            
+            # 6. Robot uptime (time since agent started)
             uptime_seconds = (datetime.utcnow() - self.start_time).total_seconds()
             
             return {
@@ -104,9 +78,12 @@ class SystemMonitor:
                 "memory_percent": round(memory_percent, 1),
                 "oak_connected": oak_connected,
                 "create3_connected": create3_connected,
-                "create3_status": create3_status,
-                "battery_level": battery_level,
-                "workspace_running": workspace_running,                "uptime": int(uptime_seconds)
+                "create3_status": create3_state,
+                "battery_level": round(battery_level, 1),
+                "is_charging": is_charging,
+                "is_docked": is_docked,
+                "workspace_running": workspace_running,
+                "uptime": int(uptime_seconds)
             }
             
         except Exception as e:
@@ -120,6 +97,8 @@ class SystemMonitor:
                 "create3_connected": False,
                 "create3_status": "error",
                 "battery_level": 0,
+                "is_charging": False,
+                "is_docked": False,
                 "workspace_running": False,
                 "uptime": 0,
                 "error": str(e)

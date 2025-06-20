@@ -12,6 +12,7 @@ from .heartbeat import HeartbeatManager
 from .command_handler import CommandHandler
 from .system_monitor import SystemMonitor
 from .auto_discovery import AutoDiscovery
+from .create3_monitor import initialize_create3_monitoring, shutdown_create3_monitoring
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -102,8 +103,7 @@ class ArtbotAgent:
                     
                     # Handle the command
                     response = await self.command_handler.handle_command(data)
-                    
-                    # Send response back if needed
+                      # Send response back if needed
                     if response:
                         await self.websocket.send(json.dumps(response))
                         
@@ -131,6 +131,10 @@ class ArtbotAgent:
         """Main agent loop"""
         logger.info(f"Starting Artbot Agent {self.config.agent_id}")
         
+        # Initialize Create3 monitoring
+        logger.info("Initializing Create3 monitoring...")
+        initialize_create3_monitoring()
+        
         # Register with hub
         if not await self.register_with_hub():
             logger.error("Failed to register with hub, exiting")
@@ -151,13 +155,16 @@ class ArtbotAgent:
             await self.handle_websocket_messages()
         except Exception as e:
             logger.error(f"Main loop error: {e}")
-        finally:
-            # Cleanup
+        finally:            # Cleanup
             self.running = False
             
             # Cancel background tasks
             for task in background_tasks:
                 task.cancel()
+            
+            # Shutdown Create3 monitoring
+            logger.info("Shutting down Create3 monitoring...")
+            shutdown_create3_monitoring()
             
             # Close WebSocket
             if self.websocket:
