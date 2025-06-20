@@ -174,24 +174,52 @@ class OAKDMonitor:
             pass
         return None
     
-    def get_oakd_monitoring(self):
-        """Get OAK-D internal monitoring data"""
+    def get_oakd_monitoring(self, enable_intrusive_monitoring=False):
+        """Get OAK-D internal monitoring data
+        
+        Args:
+            enable_intrusive_monitoring: If True, opens the device for detailed metrics.
+                                       If False (default), returns basic device info only.
+        """
+        # Basic device detection without opening the device
+        basic_data = {
+            'chip_temp': None,
+            'css_cpu': None,
+            'mss_cpu': None,
+            'css_memory_used': None,
+            'css_memory_total': None,
+            'css_memory_percent': None,
+            'ddr_memory_used': None,
+            'ddr_memory_total': None,
+            'ddr_memory_percent': None,
+            'usb_speed': None,
+            'device_name': None,
+            'mxid': None,
+            'error': None
+        }
+        
+        # If intrusive monitoring is disabled, return basic data only
+        if not enable_intrusive_monitoring:
+            # Just check if device is present via lsusb without opening it
+            try:
+                oakd_check = subprocess.run(
+                    "lsusb | grep '03e7:2485'", 
+                    shell=True, capture_output=True, text=True
+                )
+                if oakd_check.returncode == 0:
+                    basic_data['device_name'] = 'OAK-D Lite'
+                    basic_data['error'] = 'Non-intrusive mode - device detected but not opened'
+                else:
+                    basic_data['error'] = 'Device not found via lsusb'
+            except Exception as e:
+                basic_data['error'] = f'Detection error: {str(e)}'
+            
+            return basic_data
+        
+        # Intrusive monitoring - only if explicitly enabled
         if not DEPTHAI_AVAILABLE:
-            return {
-                'chip_temp': None,
-                'css_cpu': None,
-                'mss_cpu': None,
-                'css_memory_used': None,
-                'css_memory_total': None,
-                'css_memory_percent': None,
-                'ddr_memory_used': None,
-                'ddr_memory_total': None,
-                'ddr_memory_percent': None,
-                'usb_speed': None,
-                'device_name': None,
-                'mxid': None,
-                'error': 'depthai not available'
-            }
+            basic_data['error'] = 'depthai not available'
+            return basic_data
         
         try:
             # Use existing camera device if available, otherwise create new one
@@ -201,39 +229,14 @@ class OAKDMonitor:
             else:
                 try:
                     device = dai.Device()
+                    logger.info("OAK-D device opened for intrusive monitoring")
                 except Exception as e:
-                    return {
-                        'chip_temp': None,
-                        'css_cpu': None,
-                        'mss_cpu': None,
-                        'css_memory_used': None,
-                        'css_memory_total': None,
-                        'css_memory_percent': None,
-                        'ddr_memory_used': None,
-                        'ddr_memory_total': None,
-                        'ddr_memory_percent': None,
-                        'usb_speed': None,
-                        'device_name': None,
-                        'mxid': None,
-                        'error': f'Device not available: {str(e)}'
-                    }
+                    basic_data['error'] = f'Device not available: {str(e)}'
+                    return basic_data
             
             if not device:
-                return {
-                    'chip_temp': None,
-                    'css_cpu': None,
-                    'mss_cpu': None,
-                    'css_memory_used': None,
-                    'css_memory_total': None,
-                    'css_memory_percent': None,
-                    'ddr_memory_used': None,
-                    'ddr_memory_total': None,
-                    'ddr_memory_percent': None,
-                    'usb_speed': None,
-                    'device_name': None,
-                    'mxid': None,
-                    'error': 'Could not access device'
-                }
+                basic_data['error'] = 'Could not access device'
+                return basic_data
             
             # Get chip temperature
             temp = device.getChipTemperature()
@@ -273,21 +276,8 @@ class OAKDMonitor:
             }
             
         except Exception as e:
-            return {
-                'chip_temp': None,
-                'css_cpu': None,
-                'mss_cpu': None,
-                'css_memory_used': None,
-                'css_memory_total': None,
-                'css_memory_percent': None,
-                'ddr_memory_used': None,
-                'ddr_memory_total': None,
-                'ddr_memory_percent': None,
-                'usb_speed': None,
-                'device_name': None,
-                'mxid': None,
-                'error': str(e)
-            }
+            basic_data['error'] = str(e)
+            return basic_data
     
     def update_power_data(self):
         """Update power monitoring data"""
@@ -298,23 +288,20 @@ class OAKDMonitor:
         else:
             self.power_data['cpu_usage'] = 0.0
             self.power_data['memory_usage'] = 0.0
-        
-        # Update OAK-D specific data
+          # Update OAK-D specific data - use non-intrusive monitoring by default
         self.power_data['usb_power_info'] = self.get_usb_power()
-        self.power_data['oakd_monitoring'] = self.get_oakd_monitoring()
+        self.power_data['oakd_monitoring'] = self.get_oakd_monitoring(enable_intrusive_monitoring=False)
         self.power_data['temperature'] = self.get_device_temperature()
         self.power_data['device_state'] = 'Active' if self.camera_active else 'Inactive'
         self.power_data['device_info'] = self.get_device_info()
         self.power_data['last_update'] = time.strftime('%H:%M:%S')
         
-        # Determine if OAK-D is connected
+        # Determine if OAK-D is connected - check USB presence
         usb_info = self.power_data['usb_power_info']
-        oakd_monitoring = self.power_data['oakd_monitoring']
         
         self.power_data['connected'] = (
             usb_info.get('status') != 'OAK-D Not Found' and
-            usb_info.get('status') != 'Error' and
-            oakd_monitoring.get('error') is None
+            usb_info.get('status') != 'Error'
         )
     
     def get_power_data(self):
@@ -355,7 +342,36 @@ class OAKDMonitor:
             'last_update': self.power_data['last_update'],
             'error': oakd_data.get('error')
         }
-
+    
+    def enable_intrusive_monitoring(self):
+        """Enable intrusive OAK-D monitoring for detailed metrics
+        
+        This will open the device and get detailed internal metrics.
+        Only use when detailed OAK-D metrics are specifically needed.
+        """
+        try:
+            self.power_data['oakd_monitoring'] = self.get_oakd_monitoring(enable_intrusive_monitoring=True)
+            logger.info("Intrusive OAK-D monitoring enabled")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to enable intrusive OAK-D monitoring: {e}")
+            return False
+    
+    def disable_intrusive_monitoring(self):
+        """Disable intrusive monitoring and close device if needed"""
+        try:
+            if self.camera_device:
+                # Close the device to free it for other applications
+                self.camera_device.close()
+                self.camera_device = None
+                logger.info("OAK-D device closed - available for other applications")
+            
+            # Switch back to non-intrusive monitoring
+            self.power_data['oakd_monitoring'] = self.get_oakd_monitoring(enable_intrusive_monitoring=False)
+            return True
+        except Exception as e:
+            logger.error(f"Error disabling intrusive monitoring: {e}")
+            return False
 
 # Global instance for the agent to use
 oakd_monitor = OAKDMonitor()

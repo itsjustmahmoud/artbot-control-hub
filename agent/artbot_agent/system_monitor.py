@@ -36,7 +36,8 @@ class SystemMonitor:
             # 2. Memory usage
             memory = psutil.virtual_memory()
             memory_percent = memory.percent
-              # 3. OAK camera connectivity and monitoring
+              # 3. OAK camera connectivity and monitoring (non-intrusive)
+            # Note: Using non-intrusive monitoring to avoid blocking other camera applications
             oakd_status = await get_oakd_status()
             oak_connected = oakd_status.get('connected', False)
             oakd_data = {
