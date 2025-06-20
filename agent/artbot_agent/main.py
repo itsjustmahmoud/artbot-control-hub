@@ -104,7 +104,8 @@ class ArtbotAgent:
                     
                     # Handle the command
                     response = await self.command_handler.handle_command(data)
-                      # Send response back if needed
+                    
+                    # Send response back if needed
                     if response:
                         await self.websocket.send(json.dumps(response))
                         
@@ -119,19 +120,76 @@ class ArtbotAgent:
             logger.error(f"WebSocket error: {e}")
     
     async def start_background_tasks(self):
-        """Start background tasks (heartbeat, monitoring)"""
+        """Start background tasks (heartbeat, monitoring, WebSocket heartbeat)"""
         tasks = [
             asyncio.create_task(self.heartbeat_manager.start()),
             asyncio.create_task(self.system_monitor.start()),
+            asyncio.create_task(self.websocket_heartbeat_loop()),
+            asyncio.create_task(self.websocket_status_loop()),
         ]
         
         logger.info("Background tasks started")
         return tasks
+      
+    async def send_websocket_message(self, message_type: str, data: dict):
+        """Send message via WebSocket"""
+        if not self.websocket:
+            logger.warning(f"Cannot send {message_type}: WebSocket not connected")
+            return False
+            
+        try:
+            message = {
+                "type": message_type,
+                "agent_id": self.config.agent_id,
+                "timestamp": datetime.utcnow().isoformat(),
+                "data": data
+            }
+            
+            await self.websocket.send(json.dumps(message))
+            logger.debug(f"Sent {message_type} message via WebSocket")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error sending {message_type} via WebSocket: {e}")
+            return False
+
+    async def websocket_heartbeat_loop(self):
+        """Send periodic heartbeat via WebSocket"""
+        while self.running:
+            try:
+                # Get essential metrics for heartbeat
+                essential_metrics = await self.system_monitor.get_essential_metrics()
+                
+                await self.send_websocket_message("heartbeat", essential_metrics)
+                
+                # Wait for heartbeat interval
+                await asyncio.sleep(self.config.heartbeat_interval)
+                
+            except Exception as e:
+                logger.error(f"WebSocket heartbeat error: {e}")
+                await asyncio.sleep(5)  # Wait before retrying
     
+    async def websocket_status_loop(self):
+        """Send periodic status updates via WebSocket"""
+        while self.running:
+            try:
+                # Get robot status
+                robot_status = await self.system_monitor.get_essential_metrics()
+                
+                await self.send_websocket_message("robot_status", robot_status)
+                
+                # Wait for monitor interval
+                await asyncio.sleep(self.config.monitor_interval)
+                
+            except Exception as e:
+                logger.error(f"WebSocket status update error: {e}")
+                await asyncio.sleep(5)  # Wait before retrying
+
     async def run(self):
-        """Main agent loop"""
+        """Main agent loop with reconnection support"""
         logger.info(f"Starting Artbot Agent {self.config.agent_id}")
-          # Initialize Create3 monitoring
+        
+        # Initialize Create3 monitoring
         logger.info("Initializing Create3 monitoring...")
         initialize_create3_monitoring()
         
@@ -144,37 +202,50 @@ class ArtbotAgent:
             logger.error("Failed to register with hub, exiting")
             return
         
-        # Connect WebSocket
-        if not await self.connect_websocket():
-            logger.error("Failed to establish WebSocket connection, exiting")
-            return
-        
         self.running = True
         
-        # Start background tasks
-        background_tasks = await self.start_background_tasks()
+        # Main loop with reconnection
+        while self.running:
+            try:
+                # Connect WebSocket
+                if not await self.connect_websocket():
+                    logger.error("Failed to establish WebSocket connection, retrying in 10 seconds...")
+                    await asyncio.sleep(10)
+                    continue
+                
+                # Start background tasks
+                background_tasks = await self.start_background_tasks()
+                
+                # Handle WebSocket messages
+                await self.handle_websocket_messages()
+                
+            except Exception as e:
+                logger.error(f"Agent error: {e}")
+            finally:
+                # Cleanup for this iteration
+                try:
+                    # Cancel background tasks
+                    if 'background_tasks' in locals():
+                        for task in background_tasks:
+                            task.cancel()
+                    
+                    # Close WebSocket
+                    if self.websocket:
+                        await self.websocket.close()
+                        self.websocket = None
+                        
+                except Exception as e:
+                    logger.error(f"Cleanup error: {e}")
+                
+                # If still running, wait before reconnecting
+                if self.running:
+                    logger.info("WebSocket disconnected, reconnecting in 5 seconds...")
+                    await asyncio.sleep(5)
         
-        # Main loop - handle WebSocket messages
-        try:
-            await self.handle_websocket_messages()
-        except Exception as e:
-            logger.error(f"Main loop error: {e}")
-        finally:            # Cleanup
-            self.running = False
-            
-            # Cancel background tasks
-            for task in background_tasks:
-                task.cancel()
-            
-            # Shutdown Create3 monitoring
-            logger.info("Shutting down Create3 monitoring...")
-            shutdown_create3_monitoring()
-            
-            # Close WebSocket
-            if self.websocket:
-                await self.websocket.close()
-            
-            logger.info("Agent stopped")
+        # Final cleanup
+        logger.info("Shutting down Create3 monitoring...")
+        shutdown_create3_monitoring()
+        logger.info("Agent stopped")
 
 async def main():
     """Entry point for the agent"""
