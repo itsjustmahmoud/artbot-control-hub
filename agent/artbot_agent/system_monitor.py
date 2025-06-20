@@ -3,6 +3,7 @@ import logging
 import os
 from datetime import datetime
 from .create3_monitor import get_create3_status
+from .oakd_monitor import get_oakd_status
 
 logger = logging.getLogger(__name__)
 
@@ -35,18 +36,23 @@ class SystemMonitor:
             # 2. Memory usage
             memory = psutil.virtual_memory()
             memory_percent = memory.percent
-            
-            # 3. OAK camera connectivity check
-            oak_connected = False
-            try:
-                # Check if camera device exists or depthai processes
-                oak_connected = (
-                    os.path.exists('/dev/video0') or 
-                    os.path.exists('/dev/dri/card0') or
-                    len(subprocess.run(["pgrep", "-f", "depthai"], capture_output=True).stdout) > 0
-                )
-            except:
-                pass
+              # 3. OAK camera connectivity and monitoring
+            oakd_status = await get_oakd_status()
+            oak_connected = oakd_status.get('connected', False)
+            oakd_data = {
+                'connected': oak_connected,
+                'device_state': oakd_status.get('device_state', 'Unknown'),
+                'device_type': oakd_status.get('device_type', 'Unknown'),
+                'chip_temperature': oakd_status.get('chip_temperature'),
+                'css_cpu_usage': oakd_status.get('css_cpu_usage'),
+                'mss_cpu_usage': oakd_status.get('mss_cpu_usage'),
+                'css_memory_percent': oakd_status.get('css_memory_percent'),
+                'ddr_memory_percent': oakd_status.get('ddr_memory_percent'),
+                'usb_speed': oakd_status.get('usb_speed'),
+                'device_name': oakd_status.get('device_name'),
+                'mxid': oakd_status.get('mxid'),
+                'error': oakd_status.get('error')
+            }
             
             # 4. Create3 connectivity and battery using ROS2
             create3_status = await get_create3_status()
@@ -67,8 +73,7 @@ class SystemMonitor:
                 workspace_running = result.returncode == 0
             except:
                 pass
-            
-            # 6. Robot uptime (time since agent started)
+              # 6. Robot uptime (time since agent started)
             uptime_seconds = (datetime.utcnow() - self.start_time).total_seconds()
             
             return {
@@ -77,14 +82,14 @@ class SystemMonitor:
                 "temperature": round(temperature, 1),
                 "memory_percent": round(memory_percent, 1),
                 "oak_connected": oak_connected,
+                "oakd_data": oakd_data,
                 "create3_connected": create3_connected,
                 "create3_status": create3_state,
                 "battery_level": round(battery_level, 1),
                 "is_charging": is_charging,
                 "is_docked": is_docked,
                 "workspace_running": workspace_running,
-                "uptime": int(uptime_seconds)
-            }
+                "uptime": int(uptime_seconds)            }
             
         except Exception as e:
             logger.error(f"Error getting essential metrics: {e}")
@@ -94,6 +99,11 @@ class SystemMonitor:
                 "temperature": 40,
                 "memory_percent": 0,
                 "oak_connected": False,
+                "oakd_data": {
+                    "connected": False,
+                    "device_state": "Error",
+                    "error": "Failed to get OAK-D data"
+                },
                 "create3_connected": False,
                 "create3_status": "error",
                 "battery_level": 0,

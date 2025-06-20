@@ -13,6 +13,7 @@ from .command_handler import CommandHandler
 from .system_monitor import SystemMonitor
 from .auto_discovery import AutoDiscovery
 from .create3_monitor import initialize_create3_monitoring, shutdown_create3_monitoring
+from .oakd_monitor import initialize_oakd_monitoring
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -130,10 +131,13 @@ class ArtbotAgent:
     async def run(self):
         """Main agent loop"""
         logger.info(f"Starting Artbot Agent {self.config.agent_id}")
-        
-        # Initialize Create3 monitoring
+          # Initialize Create3 monitoring
         logger.info("Initializing Create3 monitoring...")
         initialize_create3_monitoring()
+        
+        # Initialize OAK-D monitoring
+        logger.info("Initializing OAK-D monitoring...")
+        initialize_oakd_monitoring()
         
         # Register with hub
         if not await self.register_with_hub():
