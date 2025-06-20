@@ -9,12 +9,14 @@ class RobotRegistryService:
     
     def __init__(self):
         self.robots: Dict[str, dict] = {}
-        
+    
     def register_robot(self, robot_id: str, robot_info: dict):
         """Register a new robot"""
         robot_data = {
             "id": robot_id,
+            "agent_id": robot_id,  # Explicitly expose agent_id as robot_id
             "name": robot_info.get("name", f"Robot {robot_id}"),
+            "hostname": robot_info.get("hostname", f"unknown-{robot_id}"),  # Pi hostname
             "status": "online",
             "current_action": "idle",
             "battery_level": robot_info.get("battery_level", 100),
@@ -23,7 +25,14 @@ class RobotRegistryService:
             "temperature": robot_info.get("temperature", 25),
             "ip_address": robot_info.get("ip_address", "unknown"),
             "location": robot_info.get("location", "Unknown"),
-            "capabilities": robot_info.get("capabilities", []),
+            "capabilities": robot_info.get("capabilities", []),            # Connectivity status
+            "create3_connected": robot_info.get("create3_connected", False),
+            "create3_status": robot_info.get("create3_status", "unknown"),
+            "oak_connected": robot_info.get("oak_connected", False),
+            # Workspace status
+            "workspace_running": robot_info.get("workspace_running", False),
+            # System metrics
+            "uptime": robot_info.get("uptime", 0),
             "last_update": datetime.utcnow().isoformat(),
             "registered_at": datetime.utcnow().isoformat()
         }

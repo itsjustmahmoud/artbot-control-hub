@@ -46,10 +46,10 @@ class SystemMonitor:
                 )
             except:
                 pass
-            
-            # 4. Create3 connectivity and battery
+              # 4. Create3 connectivity and battery
             create3_connected = False
             battery_level = 0
+            create3_status = "unknown"
             try:
                 # Try to ping Create3 IP
                 create3_ip = os.getenv("CREATE3_IP", "192.168.186.2")
@@ -60,16 +60,26 @@ class SystemMonitor:
                 )
                 create3_connected = result.returncode == 0
                 
-                # Get battery level if connected
+                # Get battery level and status if connected
                 if create3_connected:
                     try:
                         import requests
+                        # Get battery status
                         response = requests.get(f'http://{create3_ip}/api/battery', timeout=2)
                         if response.status_code == 200:
                             battery_data = response.json()
                             battery_level = battery_data.get('level', 0)
+                        
+                        # Get robot status
+                        status_response = requests.get(f'http://{create3_ip}/api/robot_state', timeout=2)
+                        if status_response.status_code == 200:
+                            state_data = status_response.json()
+                            create3_status = state_data.get('state', 'unknown')
+                        else:
+                            create3_status = "connected"
                     except:
                         battery_level = 85  # Default fallback
+                        create3_status = "connected"
             except:
                 pass
             
@@ -84,8 +94,7 @@ class SystemMonitor:
                 workspace_running = result.returncode == 0
             except:
                 pass
-            
-            # 6. Robot uptime (time since agent started)
+              # 6. Robot uptime (time since agent started)
             uptime_seconds = (datetime.utcnow() - self.start_time).total_seconds()
             
             return {
@@ -95,9 +104,9 @@ class SystemMonitor:
                 "memory_percent": round(memory_percent, 1),
                 "oak_connected": oak_connected,
                 "create3_connected": create3_connected,
+                "create3_status": create3_status,
                 "battery_level": battery_level,
-                "workspace_running": workspace_running,
-                "uptime": int(uptime_seconds)
+                "workspace_running": workspace_running,                "uptime": int(uptime_seconds)
             }
             
         except Exception as e:
@@ -109,6 +118,7 @@ class SystemMonitor:
                 "memory_percent": 0,
                 "oak_connected": False,
                 "create3_connected": False,
+                "create3_status": "error",
                 "battery_level": 0,
                 "workspace_running": False,
                 "uptime": 0,

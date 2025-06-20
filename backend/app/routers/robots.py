@@ -364,3 +364,61 @@ async def get_robot_workspace_logs(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get workspace logs: {str(e)}"
         )
+
+@router.get("/{robot_id}/metrics")
+async def get_robot_metrics(robot_id: str, user: Dict[str, Any] = Depends(require_robot_view)):
+    """Get detailed robot metrics for core data points validation"""
+    robot = robot_manager.get_robot(robot_id)
+    agent = robot_manager.get_agent(robot_id)
+    
+    if not robot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Robot {robot_id} not found"
+        )
+    
+    # Core metrics as specified by user requirements
+    core_metrics = {
+        # Robot Identity
+        "robot_id": robot.get("id"),
+        "agent_id": robot.get("agent_id"),
+        "robot_name": robot.get("name"),
+        "pi_hostname": robot.get("hostname"),
+        
+        # System Metrics (from Raspberry Pi)
+        "cpu_usage": robot.get("cpu_usage"),
+        "temperature": robot.get("temperature"), 
+        "memory_usage": robot.get("memory_usage"),
+        
+        # Connectivity Status
+        "oak_camera_connected": robot.get("oak_connected"),
+        "create3_connected": robot.get("create3_connected"),
+        "create3_status": robot.get("create3_status"),
+        
+        # Robot Status & Metrics
+        "battery_level": robot.get("battery_level"),
+        "workspace_running": robot.get("workspace_running"),
+        "current_action": robot.get("current_action"),
+        "uptime": robot.get("uptime"),
+        
+        # Network & Connection Info
+        "ip_address": robot.get("ip_address"),
+        "last_update": robot.get("last_update"),
+        "status": robot.get("status")
+    }
+    
+    # Agent data for additional context
+    agent_data = None
+    if agent:
+        agent_data = {
+            "hostname": agent.get("hostname"),
+            "last_seen": agent.get("last_seen"),
+            "system_info": agent.get("system_info")
+        }
+    
+    return {
+        "robot_id": robot_id,
+        "core_metrics": core_metrics,
+        "agent_data": agent_data,
+        "timestamp": datetime.utcnow().isoformat()
+    }

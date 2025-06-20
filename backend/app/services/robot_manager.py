@@ -93,28 +93,33 @@ class RobotManager:
         logger.info(f"Registering agent {agent_id} with info: {agent_info}")
         
         agent_data = self.agent_registry.register_agent(agent_id, agent_info)
-        
-        # Also register this agent as a robot in the robot registry
+          # Also register this agent as a robot in the robot registry
         robot_info = {
             "name": agent_info.get("hostname", f"Robot {agent_id}"),
+            "hostname": agent_info.get("hostname", f"unknown-{agent_id}"),  # Pi hostname
             "ip_address": agent_info.get("ip_address", "unknown"),
             "battery_level": 100,  # Default, will be updated by heartbeat
             "cpu_usage": 0,        # Default, will be updated by heartbeat
             "memory_usage": 0,     # Default, will be updated by heartbeat
             "temperature": 25,     # Default, will be updated by heartbeat
             "location": "Museum",  # Default location
-            "capabilities": agent_info.get("robot_info", {}).get("capabilities", [])
+            "capabilities": agent_info.get("robot_info", {}).get("capabilities", []),
+            # Initialize connectivity status
+            "create3_connected": False,  # Will be updated by heartbeat
+            "oak_connected": False,      # Will be updated by heartbeat
+            "workspace_running": False,  # Will be updated by heartbeat
+            "uptime": 0                  # Will be updated by heartbeat
         }
         
         logger.info(f"Creating robot entry for agent {agent_id} with data: {robot_info}")
         robot_data = self.register_robot(agent_id, robot_info)
         logger.info(f"Robot registered successfully: {robot_data}")
-        
-        # Log the registration
+          # Log the registration
         self.logging_service.add_system_log({
             "level": "INFO",
             "message": f"Agent {agent_id} registered from {agent_info.get('ip_address', 'unknown')}",
-            "component": "robot_manager"        })
+            "component": "robot_manager"
+        })
         
         return agent_data
     
@@ -141,8 +146,11 @@ class RobotManager:
                     robot_update["battery_level"] = data["battery_level"]
                 if "workspace_running" in data:
                     robot_update["current_action"] = "person_following" if data["workspace_running"] else "idle"
+                    robot_update["workspace_running"] = data["workspace_running"]
                 if "create3_connected" in data:
                     robot_update["create3_connected"] = data["create3_connected"]
+                if "create3_status" in data:
+                    robot_update["create3_status"] = data["create3_status"]
                 if "oak_connected" in data:
                     robot_update["oak_connected"] = data["oak_connected"]
                 if "uptime" in data:
