@@ -166,10 +166,9 @@ class ConnectionManager:
             await self.broadcast_to_type({
                 "type": "command_response",
                 "agent_id": agent_id,
-                "command_id": command_id,
-                "success": success,
+                "command_id": command_id,                "success": success,
                 "data": message.get("data", {})
             }, "dashboard")
         
         else:
-            logger.warning(f"Unknown message type from agent {agent_id}: {message_type}")
+            logger.warning(f"Unknown message type from agent {agent_id}: {message_type}. Full message: {message}")

@@ -63,15 +63,14 @@ class RobotManager:
         if success:
             # Update health monitoring if health data is present
             if any(key in status_data for key in ['battery_level', 'cpu_usage', 'memory_usage', 'temperature']):
-                self.health_service.update_robot_health(robot_id, status_data)
-                
-            # Broadcast update via WebSocket
+                self.health_service.update_robot_health(robot_id, status_data)            # Broadcast update via WebSocket
             if self.websocket_manager:
-                self.websocket_manager.broadcast_to_dashboard({
+                import asyncio
+                asyncio.create_task(self.websocket_manager.broadcast_to_type({
                     "type": "robot_update",
                     "robot_id": robot_id,
                     "data": status_data
-                })
+                }, "dashboard"))
         
         return success
     
